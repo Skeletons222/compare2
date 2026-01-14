@@ -1,0 +1,682 @@
+以下是添加详细中文注释后的完整配置文件，注释覆盖核心功能、关键参数含义及配置目的，便于理解和维护：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 核心说明：此配置文件适用于 macOS 10.14.x 系统，专门适配原生支持 CoffeeLake 架构的设备（如CoffeeLake处理器的电脑黑苹果配置） -->
+    <key>Comment</key>
+    <string>This file is for 10.14.x with native CoffeeLake support</string>
+
+    <!-- ACPI 相关配置：高级配置和电源接口，负责系统硬件与系统软件的通信适配 -->
+    <key>ACPI</key>
+    <dict>
+        <!-- 自动合并ACPI表：开启后Clover会自动合并多个ACPI文件，避免冲突 -->
+        <key>AutoMerge</key>
+        <true/>
+        <!-- 修复ACPI表头部：解决部分ACPI表头部格式错误导致的兼容性问题 -->
+        <key>FixHeaders</key>
+        <true/>
+        <!-- 禁用特定ACPI文件说明：因已启用SSDT/Generate/PluginType=true（CPU电源管理），需禁用其他形式的CPU电源管理相关ACPI文件 -->
+        <key>Comment-DisabledAML</key>
+        <string>Disable other forms of CPU PM due to SSDT/Generate/PluginType=true</string>
+        <!-- 需禁用的ACPI文件列表：这些文件与当前CPU电源管理方案冲突，禁用后避免重复加载 -->
+        <key>DisabledAML</key>
+        <array>
+            <string>SSDT.aml</string>
+            <string>SSDT-XCPM.aml</string>
+            <string>SSDT-PluginType1.aml</string>
+        </array>
+
+        <!-- DSDT 配置：差分系统描述表，用于修补原生DSDT中的硬件适配问题 -->
+        <key>DSDT</key>
+        <dict>
+            <!-- 不删除OEM的DSM方法：保留厂商原生的设备特定方法，避免硬件功能异常 -->
+            <key>DropOEM_DSM</key>
+            <false/>
+
+            <!-- DSDT修复项：针对IRQ（中断请求）相关的修复，用于解决板载音频、USB等设备的中断冲突 -->
+            <key>Fixes</key>
+            <dict>
+                <key>Comment-IRQ Fix</key>
+                <string>The following fixes may be needed for onboard audio/USB/etc</string>
+                <key>FixTMR</key>
+                <false/> <!-- 不修复定时器（TMR）：当前硬件无相关冲突 -->
+                <key>FixRTC</key>
+                <false/> <!-- 不修复实时时钟（RTC）：避免与系统时间同步冲突 -->
+                <key>FixIPIC</key>
+                <false/> <!-- 不修复中断控制器（IPIC）：CoffeeLake架构无需此修复 -->
+                <key>FixHPET</key>
+                <false/> <!-- 不修复高精度事件计时器（HPET）：原生支持良好 -->
+            </dict>
+
+            <!-- DSDT补丁列表：通过查找替换二进制数据，修改DSDT中的硬件标识、方法名等，适配macOS -->
+            <key>Patches</key>
+            <array>
+                <!-- 1. 将OSID改为XSID：避免与_XOSI补丁冲突，确保系统识别正确的操作系统类型 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change OSID to XSID (to avoid match against _OSI XOSI patch)</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前配置无需此修改 -->
+                    <key>Find</key>
+                    <data>T1NJRA==</data> <!-- 原数据：OSID（Base64编码） -->
+                    <key>Replace</key>
+                    <data>WFNJRA==</data> <!-- 替换为：XSID（Base64编码） -->
+                </dict>
+                <!-- 2. 将_OSI改为XOSI：用于操作系统接口适配，避免部分硬件功能被限制 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change _OSI to XOSI</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前配置无需此修改 -->
+                    <key>Find</key>
+                    <data>X09TSQ==</data> <!-- 原数据：_OSI -->
+                    <key>Replace</key>
+                    <data>WE9TSQ==</data> <!-- 替换为：XOSI -->
+                </dict>
+                <!-- 3. 将_DSM改为XDSM：避免与其他DSM方法冲突，确保设备特定配置正常加载 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change _DSM to XDSM</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前配置无需此修改 -->
+                    <key>Find</key>
+                    <data>X0RTTQ==</data> <!-- 原数据：_DSM -->
+                    <key>Replace</key>
+                    <data>WERTTQ==</data> <!-- 替换为：XDSM -->
+                </dict>
+                <!-- 4. 将EC0改为EC：统一嵌入式控制器（Embedded Controller）标识，适配macOS驱动 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change EC0 to EC</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前硬件EC标识已兼容 -->
+                    <key>Find</key>
+                    <data>RUMwXw==</data> <!-- 原数据：EC0_ -->
+                    <key>Replace</key>
+                    <data>RUNfXw==</data> <!-- 替换为：EC_ -->
+                </dict>
+                <!-- 5. 将H_EC改为EC：统一嵌入式控制器标识，解决驱动识别问题 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change H_EC to EC</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前硬件EC标识已兼容 -->
+                    <key>Find</key>
+                    <data>SF9FQw==</data> <!-- 原数据：H_EC -->
+                    <key>Replace</key>
+                    <data>RUNfXw==</data> <!-- 替换为：EC_ -->
+                </dict>
+                <!-- 6. 将ECDV改为EC：统一嵌入式控制器标识，确保驱动正常加载 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change ECDV to EC</string>
+                    <key>Disabled</key>
+                    <true/> <!-- 禁用：当前硬件EC标识已兼容 -->
+                    <key>Find</key>
+                    <data>RUNEVg==</data> <!-- 原数据：ECDV -->
+                    <key>Replace</key>
+                    <data>RUNfXw==</data> <!-- 替换为：EC_ -->
+                </dict>
+                <!-- 7. 将HDAS改为HDEF：将音频控制器标识改为macOS原生支持的HDEF，适配音频驱动 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change HDAS to HDEF</string>
+                    <key>Find</key>
+                    <data>SERBUw==</data> <!-- 原数据：HDAS -->
+                    <key>Replace</key>
+                    <data>SERFRg==</data> <!-- 替换为：HDEF -->
+                </dict>
+                <!-- 8. 将HECI改为IMEI：将Intel ME控制器标识改为IMEI，适配macOS对Intel管理引擎的识别 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change HECI to IMEI</string>
+                    <key>Find</key>
+                    <data>SEVDSQ==</data> <!-- 原数据：HECI -->
+                    <key>Replace</key>
+                    <data>SU1FSQ==</data> <!-- 替换为：IMEI -->
+                </dict>
+                <!-- 9. 将MEI改为IMEI：统一Intel ME控制器标识，确保管理引擎功能正常 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change MEI to IMEI</string>
+                    <key>Find</key>
+                    <data>TUVJXw==</data> <!-- 原数据：MEI_ -->
+                    <key>Replace</key>
+                    <data>SU1FSQ==</data> <!-- 替换为：IMEI -->
+                </dict>
+                <!-- 10. 将GFX0改为IGPU：将集成显卡标识改为macOS原生支持的IGPU，适配核显驱动 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change GFX0 to IGPU</string>
+                    <key>Find</key>
+                    <data>R0ZYMA==</data> <!-- 原数据：GFX0 -->
+                    <key>Replace</key>
+                    <data>SUdQVQ==</data> <!-- 替换为：IGPU -->
+                </dict>
+                <!-- 11. Thinkpad专用：将PCI0.VID改为IGPU（方式1）：适配Thinkpad机型的PCI总线显卡标识 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change PCI0.VID to IGPU #1 (Thinkpad)</string>
+                    <key>Find</key>
+                    <data>UENJMFZJRF8=</data> <!-- 原数据：PCI0VID_ -->
+                    <key>Replace</key>
+                    <data>UENJMElHUFU=</data> <!-- 替换为：PCI0IGPU -->
+                </dict>
+                <!-- 12. Thinkpad专用：将PCI0.VID改为IGPU（方式2）：进一步适配Thinkpad机型的显卡识别 -->
+                <dict>
+                    <key>Comment</key>
+                    <string>change PCI0.VID to IGPU #2 (Thinkpad)</string>
+                    <key>Find</key>
+                    <data>VklEXwhfQURSDAAAAgA=</data> <!-- 原数据：VID\_ADR（二进制） -->
+                    <key>Replace</key>
+                    <data>SUdQVQhfQURSDAAAAgA=</data> <!-- 替换为：IGPU\_ADR（二进制） -->
+                </dict>
+            </array>
+        </dict>
+
+        <!-- 需删除的ACPI表：避免冲突或无用的ACPI表加载 -->
+        <key>DropTables</key>
+        <array>
+            <!-- 删除MCFG表：内存映射配置表，部分主板原生MCFG与macOS不兼容，删除后使用Clover生成的适配表 -->
+            <dict>
+                <key>Signature</key>
+                <string>#MCFG</string>
+            </dict>
+            <!-- 删除DMAR表：直接内存访问重映射表，禁用VT-d功能时需删除，避免内核崩溃 -->
+            <dict>
+                <key>Signature</key>
+                <string>DMAR</string>
+            </dict>
+            <!-- 删除特定SSDT表：xh_rvp10相关的SSDT表与当前配置冲突，需删除 -->
+            <dict>
+                <key>Signature</key>
+                <string>SSDT</string>
+                <key>TableId</key>
+                <string>xh_rvp10</string>
+            </dict>
+        </array>
+
+        <!-- SSDT配置：补充系统描述表，用于生成或加载自定义电源管理等功能 -->
+        <key>SSDT</key>
+        <dict>
+            <!-- 不删除OEM的SSDT表：保留厂商原生的补充表，避免硬件功能缺失 -->
+            <key>DropOem</key>
+            <false/>
+            <!-- 生成SSDT相关配置 -->
+            <dict>
+                <key>Generate</key>
+                <dict>
+                    <!-- 启用PluginType1：生成PluginType1类型的SSDT，用于CPU电源管理（原生支持CoffeeLake） -->
+                    <key>PluginType</key>
+                    <true/>
+                </dict>
+            </dict>
+            <!-- 不忽略OEM表ID：保留SSDT表的原生ID，确保识别正常 -->
+            <key>NoOemTableId</key>
+            <false/>
+        </dict>
+    </dict>
+
+    <!-- 启动相关配置：控制Clover启动菜单、启动参数等 -->
+    <key>Boot</key>
+    <dict>
+        <!-- 启动参数：关键参数说明如下 -->
+        <!-- dart=0：禁用VT-d（直接内存访问），避免与部分硬件驱动冲突 -->
+        <!-- nv_disable=1：禁用NVIDIA独立显卡，强制使用集成显卡（适用于NVIDIA显卡无macOS驱动的情况） -->
+        <!-- -disablegfxfirmware：禁用显卡固件加载，避免固件不兼容导致的黑屏 -->
+        <!-- -cdfon：强制启用显卡硬件加速 -->
+        <!-- -igfxnohdmi：禁用集成显卡的HDMI输出（如需使用HDMI需删除此参数） -->
+        <key>Arguments</key>
+        <string>dart=0 nv_disable=1 -disablegfxfirmware -cdfon -igfxnohdmi</string>
+        <!-- 默认启动卷（注释）：默认使用上次启动的卷，如需指定可取消注释并修改 -->
+        <key>#DefaultVolume</key>
+        <string>LastBootedVolume</string>
+        <!-- 永不休眠：禁用系统休眠功能，避免休眠后无法唤醒的问题 -->
+        <key>NeverHibernate</key>
+        <true/>
+        <!-- 禁用安全启动：macOS黑苹果无需安全启动，开启后会导致启动失败 -->
+        <key>Secure</key>
+        <false/>
+        <!-- 启动菜单超时时间：5秒后自动启动默认卷 -->
+        <key>Timeout</key>
+        <integer>5</integer>
+    </dict>
+
+    <!-- 设备相关配置：硬件设备的驱动注入、标识修改等 -->
+    <key>Devices</key>
+    <dict>
+        <!-- 新增设备属性：通过注入虚假属性禁用不需要的显卡驱动 -->
+        <key>AddProperties</key>
+        <array>
+            <!-- 禁用NVIDIA显卡驱动：注入虚假属性，让系统不加载NVIDIA驱动 -->
+            <dict>
+                <key>Device</key>
+                <string>NVidia</string>
+                <key>Key</key>
+                <string>name</string>
+                <key>Value</key>
+                <data>I2Rpc3BsYXkA</data> <!-- 值：#display（Base64编码） -->
+                <key>Comment</key>
+                <string>Inject "name" as (data)"#display" to disable graphics drivers on NVidia</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>NVidia</string>
+                <key>Key</key>
+                <string>IOName</string>
+                <key>Value</key>
+                <string>#display</string>
+                <key>Comment</key>
+                <string>Inject "IOName" as "#display" to disable graphics drivers on NVidia</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>NVidia</string>
+                <key>Key</key>
+                <string>class-code</string>
+                <key>Value</key>
+                <data>/////w==</data> <!-- 虚假的设备类代码 -->
+                <key>Comment</key>
+                <string>Inject bogus class-code to prevent graphics drivers loading for NVidia</string>
+            </dict>
+
+            <!-- 禁用AMD显卡驱动：注入虚假属性，让系统不加载AMD驱动 -->
+            <dict>
+                <key>Device</key>
+                <string>ATI</string>
+                <key>Key</key>
+                <string>name</string>
+                <key>Value</key>
+                <data>I2Rpc3BsYXkA</data> <!-- 值：#display -->
+                <key>Comment</key>
+                <string>Inject "name" as (data)"#display" to disable graphics drivers on AMD</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>ATI</string>
+                <key>Key</key>
+                <string>IOName</string>
+                <key>Value</key>
+                <string>#display</string>
+                <key>Comment</key>
+                <string>Inject "IOName" as "#display" to disable graphics drivers on AMD</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>ATI</string>
+                <key>Key</key>
+                <string>class-code</string>
+                <key>Value</key>
+                <data>/////w==</data> <!-- 虚假的设备类代码 -->
+                <key>Comment</key>
+                <string>Inject bogus class-code to prevent graphics drivers loading for AMD</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>ATI</string>
+                <key>Key</key>
+                <string>vendor-id</string>
+                <key>Value</key>
+                <data>//8AAA==</data> <!-- 虚假的厂商ID -->
+                <key>Comment</key>
+                <string>Inject bogus vendor-id to prevent graphics drivers loading for AMD</string>
+            </dict>
+            <dict>
+                <key>Device</key>
+                <string>ATI</string>
+                <key>Key</key>
+                <string>device-id</string>
+                <key>Value</key>
+                <data>//8AAA==</data> <!-- 虚假的设备ID -->
+                <key>Comment</key>
+                <string>Inject bogus device-id to prevent graphics drivers loading for AMD</string>
+            </dict>
+        </array>
+
+        <!-- 音频配置：控制音频驱动注入 -->
+        <key>Audio</key>
+        <dict>
+            <!-- 不注入音频驱动（Inject=0）：需通过第三方音频驱动（如AppleALC）实现音频功能，此处禁用默认注入 -->
+            <key>Inject</key>
+            <integer>0</integer>
+        </dict>
+
+        <!-- 虚假设备ID：用于屏蔽或修改原生设备ID，避免驱动冲突 -->
+        <key>FakeID</key>
+        <dict>
+            <!-- 说明：避免Clover自动注入Skylake架构的Intel核显虚假ID，CoffeeLake需使用原生ID -->
+            <key>#Kaby Lake-Comment</key>
+            <string>To avoid automatic Clover fake device-id (Skylake) injection</string>
+            <!-- Intel核显虚假ID（注释）：CoffeeLake核显（如UHD630）无需虚假ID，使用原生ID即可 -->
+            <key>#IntelGFX</key>
+            <string>0x59168086</string>
+        </dict>
+
+        <!-- 设备属性：针对特定PCI设备注入配置，适配macOS驱动 -->
+        <key>Properties</key>
+        <dict>
+            <!-- 集成显卡（PCI路径：PciRoot(0)/Pci(0x02,0)）：UHD630核显的核心配置 -->
+            <key>PciRoot(0)/Pci(0x02,0)</key>
+            <dict>
+                <!-- 核显平台ID：AAPL,ig-platform-id 是macOS识别核显的关键参数，AABbPg==对应0x3e9b0000（UHD630适配值） -->
+                <key>AAPL,ig-platform-id</key>
+                <data>AACbPg==</data>
+                <!-- 音频关联（注释）：指定核显关联的音频控制器，需配合音频驱动使用 -->
+                <key>#hda-gfx</key>
+                <string>onboard-1</string>
+                <!-- 禁用连接检测（注释）：用于强制识别无EDID的显示器 -->
+                <key>#AAPL00,override-no-connect</key>
+                <data></data>
+                <!-- 忽略EDID（注释）：强制使用自定义EDID时启用 -->
+                <key>#AAPL00,override-no-edid</key>
+                <data></data>
+                <!-- DVMT内存分配说明：BIOS分配32MB DVMT，帧缓冲区19MB，光标缓存9MB（适配UHD630的内存需求） -->
+                <key># DVMT-prealloc</key>
+                <string>32MB BIOS, 19MB framebuffer, 9MB cursor bytes (credit RehabMan)</string>
+                <!-- 启用帧缓冲区补丁：开启后才能修改帧缓冲区相关参数 -->
+                <key>framebuffer-patch-enable</key>
+                <integer>1</integer>
+                <!-- 帧缓冲区 stolen 内存：AAAwAQ==对应32MB（与BIOS DVMT分配匹配） -->
+                <key>framebuffer-stolenmem</key>
+                <data>AAAwAQ==</data>
+                <!-- 帧缓冲区 fbmem 内存：AACQAA==对应19MB（帧缓冲区核心内存） -->
+                <key>framebuffer-fbmem</key>
+                <data>AACQAA==</data>
+
+                <!-- 端口配置：LVDS（内置屏幕）改为DP（DisplayPort）（注释，按需启用） -->
+                <key>## @0 LVDS-&gt;DP</key>
+                <string></string>
+                <key>#framebuffer-con0-enable</key>
+                <integer>1</integer> <!-- 启用第0端口 -->
+                <key>#framebuffer-con0-type</key>
+                <data>AAQAAA==</data> <!-- 端口类型：DP -->
+
+                <!-- 端口配置：HDMI（第1端口）（注释，按需启用） -->
+                <key>## @1 HDMI</key>
+                <string></string>
+                <key>#framebuffer-con1-enable</key>
+                <integer>1</integer> <!-- 启用第1端口 -->
+                <key>#framebuffer-con1-type</key>
+                <data>AAgAAA==</data> <!-- 端口类型：HDMI -->
+                <key># Note1</key>
+                <string> no HDMI example in CoffeeLake, flags 86090000 seen in CannonLake?</string>
+                <key>#framebuffer-con1-flags</key>
+                <data>hwEAAA==</data> <!-- 端口标志位 -->
+                <key>#framebuffer-con1-pipe</key>
+                <data>EgAAAA==</data> <!-- 端口管道：Pipe A -->
+
+                <!-- 端口配置：HDMI（第2端口）（注释，按需启用） -->
+                <key>## @2 HDMI</key>
+                <string></string>
+                <key>#framebuffer-con2-enable</key>
+                <integer>1</integer>
+                <key>#framebuffer-con2-type</key>
+                <data>AAgAAA==</data>
+                <key>#framebuffer-con2-flags</key>
+                <data>hwEAAA==</data>
+                <key>#framebuffer-con2-pipe</key>
+                <data>EgAAAA==</data>
+
+                <!-- 端口配置：HDMI（第3端口）（注释，按需启用） -->
+                <key>## @3 HDMI</key>
+                <string></string>
+                <key>#framebuffer-con3-enable</key>
+                <integer>1</integer>
+                <key>#framebuffer-con3-type</key>
+                <data>AAgAAA==</data>
+                <key>#framebuffer-con3-flags</key>
+                <data>hwEAAA==</data>
+                <key>#framebuffer-con3-pipe</key>
+                <data>EgAAAA==</data>
+
+                <!-- 端口类型修改（注释）：将0204（DP）改为0306（HDMI） -->
+                <key>#2 0204-&gt;0306</key>
+                <string>0x3e9b0000, 0306 instead of 0204, HDMI</string>
+                <key>#2 framebuffer-con2-enable</key>
+                <integer>1</integer>
+                <key>#2 framebuffer-con2-alldata</key>
+                <data>AwYIAAAEAADHAwAA</data> <!-- 端口完整配置数据 -->
+
+                <!-- 禁用所有外部端口（注释）：仅保留内置屏幕时启用 -->
+                <key>#3 no external</key>
+                <string>0x3e9b0000, eliminate all external ports (0105 and 0204)</string>
+                <key>#3 framebuffer-con1-enable</key>
+                <integer>1</integer>
+                <key>#3 framebuffer-con1-alldata</key>
+                <data>/wAAAAEAAAAgAAAA/wAAAAEAAAAgAAAA</data>
+            </dict>
+
+            <!-- 音频控制器（PCI路径：PciRoot(0)/Pci(0x1f,3)）：板载音频的配置 -->
+            <key>PciRoot(0)/Pci(0x1f,3)</key>
+            <dict>
+                <!-- 布局ID（注释）：指定AppleALC音频驱动的布局，需根据声卡型号修改（如3对应ALC256） -->
+                <key>#layout-id</key>
+                <integer>3</integer>
+                <!-- 引脚配置（注释）：自定义声卡引脚映射时使用 -->
+                <key>#PinConfigurations</key>
+                <data></data>
+                <!-- 音频关联（注释）：关联核显的HDMI音频 -->
+                <key>#hda-gfx</key>
+                <string>onboard-1</string>
+                <!-- 禁用控制器补丁（注释）：部分声卡无需控制器补丁，避免冲突 -->
+                <key>#no-controller-patch</key>
+                <integer>1</integer>
+            </dict>
+        </dict>
+
+        <!-- USB配置：解决USB端口识别、供电等问题 -->
+        <key>USB</key>
+        <dict>
+            <!-- 修复USB所有权：让macOS正确识别USB控制器的所有权，避免端口无法使用 -->
+            <key>FixOwnership</key>
+            <true/>
+            <!-- 添加ClockID：部分USB设备需要ClockID才能正常工作，如USB 3.0设备 -->
+            <key>AddClockID</key>
+            <true/>
+            <!-- 注入USB驱动：自动注入必要的USB驱动，适配USB 2.0/3.0端口 -->
+            <key>Inject</key>
+            <true/>
+        </dict>
+
+        <!-- 禁用Intel HDMI音频：因启动参数已禁用HDMI输出，此处同步禁用HDMI音频 -->
+        <key>UseIntelHDMI</key>
+        <false/>
+    </dict>
+
+    <!-- 禁用驱动：不加载指定的内核扩展（kext） -->
+    <key>DisableDrivers</key>
+    <array>
+        <!-- 禁用VBoxHfs驱动：VirtualBox的HFS文件系统驱动，与黑苹果启动无关，避免冲突 -->
+        <string>VBoxHfs</string>
+    </array>
+
+    <!-- GUI配置：Clover启动菜单的界面、扫描选项等 -->
+    <key>GUI</key>
+    <dict>
+        <!-- 自定义启动项：手动添加启动项，如macOS恢复模式、Windows -->
+        <key>Custom</key>
+        <dict>
+            <key>Entries</key>
+            <array>
+                <!-- macOS恢复模式：不隐藏，便于系统修复 -->
+                <dict>
+                    <key>Hidden</key>
+                    <false/>
+                    <key>Type</key>
+                    <string>OSXRecovery</string>
+                </dict>
+                <!-- Windows启动项：添加Windows系统启动入口，标题为"Windows" -->
+                <dict>
+                    <key>Type</key>
+                    <string>Windows</string>
+                    <key>Title</key>
+                    <string>Windows</string>
+                </dict>
+            </array>
+        </dict>
+
+        <!-- 隐藏启动项：不显示Preboot（预启动分区），避免菜单冗余 -->
+        <key>Hide</key>
+        <array>
+            <string>Preboot</string>
+        </array>
+
+        <!-- 鼠标配置：禁用Clover启动菜单的鼠标支持，避免占用资源 -->
+        <key>Mouse</key>
+        <dict>
+            <key>Enabled</key>
+            <false/>
+        </dict>
+
+        <!-- 扫描选项：控制Clover扫描哪些类型的启动项 -->
+        <key>Scan</key>
+        <dict>
+            <key>Entries</key>
+            <true/> <!-- 扫描系统启动项（如macOS、Windows） -->
+            <key>Legacy</key>
+            <false/> <!-- 不扫描传统BIOS启动项 -->
+            <key>Linux</key>
+            <true/> <!-- 扫描Linux系统启动项 -->
+            <key>Tool</key>
+            <true/> <!-- 扫描Clover工具（如磁盘工具、终端） -->
+        </dict>
+
+        <!-- 启动菜单分辨率（注释）：默认使用显示器原生分辨率，如需固定可取消注释并修改 -->
+        <key>#ScreenResolution</key>
+        <string>1920x1080</string>
+        <!-- 启动菜单主题：使用"BGM"主题，需将主题文件放入Clover的themes目录 -->
+        <key>Theme</key>
+        <string>BGM</string>
+    </dict>
+
+    <!-- 显卡配置：控制显卡驱动注入、EDID等 -->
+    <key>Graphics</key>
+    <dict>
+        <!-- EDID配置（注释）：不注入自定义EDID，使用显示器原生EDID -->
+        <key>#EDID</key>
+        <dict>
+            <key>Inject</key>
+            <false/>
+        </dict>
+        <!-- 核显平台ID（注释）：与设备属性中的AAPL,ig-platform-id一致，此处留作备份 -->
+        <key>#ig-platform-id</key>
+        <string>0x3e9b0000</string>
+        <!-- 显卡驱动注入：控制是否注入ATI/NVIDIA/Intel显卡驱动 -->
+        <key>Inject</key>
+        <dict>
+            <key>ATI</key>
+            <true/> <!-- 注入ATI显卡驱动（实际已通过AddProperties禁用，此处为兼容设置） -->
+            <key>Intel</key>
+            <false/> <!-- 不注入Intel核显驱动（使用原生驱动，通过设备属性配置） -->
+            <key>NVidia</key>
+            <true/> <!-- 注入NVIDIA显卡驱动（实际已禁用，此处为兼容设置） -->
+        </dict>
+    </dict>
+
+    <!-- 内核与驱动补丁：修改内核或驱动的二进制代码，解决兼容性问题 -->
+    <key>KernelAndKextPatches</key>
+    <dict>
+        <!-- 修复AppleRTC：解决部分主板RTC与macOS冲突导致的启动失败或时间错误 -->
+        <key>AppleRTC</key>
+        <true/>
+        <!-- 不修复Dell SMBIOS：非Dell机型，无需此补丁 -->
+        <key>DellSMBIOSPatch</key>
+        <false/>
+        <!-- 修复内核LAPIC：解决部分主板本地APIC（高级可编程中断控制器）与macOS内核冲突 -->
+        <key>KernelLapic</key>
+        <true/>
+        <!-- 启用内核电源管理：确保CPU电源管理功能正常（如变频、休眠） -->
+        <key>KernelPm</key>
+        <true/>
+        <!-- 强制加载驱动：即使系统认为不兼容，也强制加载指定驱动 -->
+        <key>ForceKextsToLoad</key>
+        <array>
+            <!-- 强制加载网络相关驱动：确保网络功能正常 -->
+            <string>\System\Library\Extensions\IONetworkingFamily.kext</string>
+        </array>
+        <!-- 驱动补丁（空）：无需修改任何驱动，留空即可 -->
+        <key>KextsToPatch</key>
+        <array/>
+        <!-- 内核补丁：直接修改macOS内核二进制代码 -->
+        <key>KernelToPatch</key>
+        <array>
+            <!-- 1. 修复MSR 0xE2重启问题：解决因_xcpm_idle导致的即时重启，由Pike R. Alpha提供 -->
+            <dict>
+                <key>Comment</key>
+                <string>MSR 0xE2 _xcpm_idle instant reboot(c) Pike R. Alpha</string>
+                <key>Disabled</key>
+                <false/> <!-- 启用此补丁 -->
+                <key>Find</key>
+                <data>ILniAAAADzA=</data> <!-- 内核中原代码（二进制） -->
+                <key>Replace</key>
+                <data>ILniAAAAkJA=</data> <!-- 替换后的代码（二进制） -->
+            </dict>
+            <!-- 2. 禁用10.13内核的驱动崩溃日志：避免驱动崩溃时生成大量日志占用资源 -->
+            <dict>
+                <key>Comment</key>
+                <string>Disable panic kext logging on 10.13 release kernel (credit vit9696)</string>
+                <key>MatchOS</key>
+                <string>10.13.x</string> <!-- 仅适用于macOS 10.13 -->
+                <key>Find</key>
+                <data>igKEwHRE</data> <!-- 原代码 -->
+                <key>Replace</key>
+                <data>igKEwOtE</data> <!-- 替换代码 -->
+            </dict>
+            <!-- 3. 禁用10.14内核的驱动崩溃日志：适用于当前配置的10.14系统 -->
+            <dict>
+                <key>Comment</key>
+                <string>Disable panic kext logging on 10.14 release kernel (credit vit9696)</string>
+                <key>MatchOS</key>
+                <string>10.14.x</string> <!-- 仅适用于macOS 10.14 -->
+                <key>Find</key>
+                <data>igKEwHRC</data> <!-- 原代码 -->
+                <key>Replace</key>
+                <data>igKEwOtC</data> <!-- 替换代码 -->
+            </dict>
+        </array>
+    </dict>
+
+    <!-- 运行时变量：控制macOS系统的运行时参数 -->
+    <key>RtVariables</key>
+    <dict>
+        <!-- 系统完整性保护（SIP）配置：0x67 表示部分禁用SIP（允许加载第三方kext、修改系统文件），黑苹果必需 -->
+        <key>CsrActiveConfig</key>
+        <string>0x67</string>
+        <!-- 启动器配置：0x28 用于禁用某些启动限制，适配黑苹果启动 -->
+        <key>BooterConfig</key>
+        <string>0x28</string>
+    </dict>
+
+    <!-- SMBIOS配置：系统管理BIOS，模拟苹果设备的硬件信息，让macOS识别为合法设备 -->
+    <key>SMBIOS</key>
+    <dict>
+        <!-- 设备型号：模拟MacBookPro15,2（2018款MacBook Pro，CoffeeLake架构，与UHD630兼容） -->
+        <key>ProductName</key>
+        <string>MacBookPro15,2</string>
+        <!-- 信任SMBIOS：使用Clover生成的SMBIOS信息，无需手动修改 -->
+        <key>Trust</key>
+        <true/>
+    </dict>
+
+    <!-- 系统参数：控制Clover的全局系统配置 -->
+    <key>SystemParameters</key>
+    <dict>
+        <!-- 驱动注入策略：Detect 表示自动检测是否需要注入驱动（如识别到macOS则注入必要驱动） -->
+        <key>InjectKexts</key>
+        <string>Detect</string>
+    </dict>
+</dict>
+</plist>
+```
+
+### 注释说明总结
+1. **结构分层**：按照配置文件的顶级节点（ACPI、Boot、Devices等）划分注释区域，每个区域先说明核心功能，再逐个解释子项。
+2. **关键参数重点标注**：对黑苹果关键配置（如`AAPL,ig-platform-id`、`CsrActiveConfig`、`SMBIOS.ProductName`）补充含义、适配场景及修改注意事项。
+3. **禁用项说明**：对禁用的配置（如`Disabled=true`、注释掉的参数）说明原因，避免误启用导致系统异常。
+4. **硬件适配提示**：明确标注配置对应的硬件（如UHD630核显、CoffeeLake架构、Thinkpad机型），便于不同设备参考修改。
+5. **参数格式解释**：对Base64编码的参数（如设备ID、内存大小）补充原始值，降低理解门槛。
+
+此注释版本保留了原始配置的所有功能，同时让非专业用户也能清晰理解每个配置项的作用，便于后续根据自身硬件调整。
